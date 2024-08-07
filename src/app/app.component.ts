@@ -78,6 +78,8 @@ export class AppComponent {
   
   suppliesExpanded = false
 
+  viewBreakdownToggled: 'USDC' | 'USDT' | null = null
+
   constructor(
     private aaveYieldService: AaveV3YieldService,
     private blockchainService: BlockchainService,
@@ -114,6 +116,13 @@ export class AppComponent {
     this.suppliesExpanded = !this.suppliesExpanded
   }
 
+  setViewBreakdown(value: 'USDC' | 'USDT' | null) {
+    if(this.viewBreakdownToggled === value) {
+      this.viewBreakdownToggled = null
+    }
+    this.viewBreakdownToggled = value
+  }
+
   async withdrawAll() {
     this.v3Positions$.subscribe(async positions => {
       const withdrawItxs = await Promise.all(positions.map(async position => {
@@ -135,9 +144,23 @@ export class AppComponent {
     this.eoa = res.at(0);
   }
 
+  formatBalance(balance: string) {
+    return parseFloat(balance).toFixed(2)
+  }
+
   openWithdraw(position: any) {
     this.withdrawPositionOpened = position;
   }
+
+  usdcBreakdown: {
+    chainId: number, 
+    amount: string
+  }[] = []
+
+  usdtBreakdown: {
+    chainId: number, 
+    amount: string
+  }[] = []
 
   async init() {
     const [address] =
@@ -155,6 +178,18 @@ export class AppComponent {
       mcUSDT,
       mcAddress
     );
+    this.usdcBreakdown = usdcBalance.breakdown.map(x => {
+      return {
+        amount: parseFloat(formatUnits(x.amount, 6)).toFixed(2),
+        chainId: x.chainId
+      }
+    })
+    this.usdtBreakdown = usdtBalance.breakdown.map(x => {
+      return {
+        amount: parseFloat(formatUnits(x.amount, 6)).toFixed(2),
+        chainId: x.chainId
+      }
+    })
     this.usdcBalance = formatUnits(usdcBalance.balance, usdcBalance.decimals);
     this.usdtBalance = formatUnits(usdtBalance.balance, usdtBalance.decimals);
     this.mcSca = mcAddress;
