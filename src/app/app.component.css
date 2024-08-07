@@ -1,0 +1,73 @@
+/* repeated-styles.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .token-container {
+    @apply bg-white border border-slate-100 overflow-hidden rounded-lg;
+  }
+
+  .token-header {
+    @apply px-5 py-3 sm:px-6 flex justify-between items-center border-b border-slate-100;
+  }
+
+  .token-logo {
+    @apply h-8 w-8;
+  }
+
+  .yield-grid {
+    @apply grid grid-cols-2 divide-x divide-gray-200;
+  }
+
+  .yield-section {
+    @apply p-5 sm:p-6;
+  }
+
+  .yield-title {
+    @apply text-base font-normal text-slate-600 mb-2 flex items-center;
+  }
+
+  .yield-value {
+    @apply text-3xl font-black mb-2;
+  }
+
+  .yield-chain {
+    @apply text-xs text-slate-500 mb-3 flex items-center;
+  }
+
+  .action-button {
+    @apply inline-flex items-center justify-center text-white text-sm
+     font-medium pb-3 pt-[0.9rem] px-8 rounded-md transition-colors duration-200 mt-4 w-full
+     hover:text-white;
+  }
+
+  .button-icon {
+    @apply h-5 w-5 mr-2 flex-shrink-0 stroke-2 -mt-[0.15rem];
+  }
+
+  .icon-small {
+    @apply h-6 w-6 mr-2;
+  }
+
+  .icon-tiny {
+    @apply h-3 w-3 text-slate-400 mr-1;
+  }
+
+  .loading-item {
+    @apply bg-gray-200 rounded-md animate-pulse;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

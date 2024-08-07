@@ -1,1 +1,13 @@
 /* You can add global styles to this file, and also import other style files */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Import Poppins font from Google Fonts */
+@font-face {
+  font-family: 'Cascaida Code';
+  src: url('./assets/CascadiaCode.ttf')
+}
+* {
+  font-family: 'Cascaida Code', sans-serif; 
+}

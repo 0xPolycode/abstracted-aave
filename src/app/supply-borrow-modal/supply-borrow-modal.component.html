@@ -1,0 +1,199 @@
+<div *ngIf="isVisible" class="modal-overlay">
+  <div *ngIf="isProcessing === false; else loading"
+    class="bg-white rounded-lg border max-w-lg w-full transform transition-all duration-200"
+    [ngClass]="{
+      'scale-95 opacity-0': !isVisible,
+      'scale-100 opacity-100': isVisible
+    }"
+    (click)="$event.stopPropagation()"
+  >
+    <div class="p-10 space-y-4">
+      <div class="flex items-center justify-between">
+        <h2
+          class="text-xl font-semibold text-gray-900 flex items-center space-x-2"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-8 w-8 text-indigo-800"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+            />
+          </svg>
+          <span class="mt-1">Supply {{ tokenSymbol }}</span>
+        </h2>
+        <button (click)="close()" class="text-gray-400 hover:text-gray-600">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+        </button>
+      </div>
+
+      <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-4">
+        <div class="">
+          <label for="amount" class="block text-sm font-medium text-gray-700"
+            >Amount to supply</label
+          >
+          <div class="relative border rounded-md grid grid-cols-12 mt-1">
+            <input
+              type="number"
+              id="amount"
+              formControlName="amount"
+              class="block py-3 px-4 border-gray-100 rounded-md text-lg outline-none sm:text-sm col-span-10 font-semibold"
+              placeholder="0.00"
+            />
+            <div
+              class="absolute border-l pl-4 inset-y-0 col-span-2 right-0 pr-3 flex items-center pointer-events-none"
+            >
+              <span class="text-gray-500 sm:text-sm">{{ tokenSymbol }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div
+          class="bg-gray-50 grid grid-cols-2 rounded p-6 text-slate-700 gap-x-4 gap-y-10 text-sm"
+        >
+          <div class="flex items-center">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-6 w-6 mr-2 text-green-500"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2.5"
+                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+              />
+            </svg>
+            <div class="flex flex-col">
+              <span class="font-semibold text-xs text-slate-600">Supply APY: </span>
+              <span class="text-green-600 font-semibold">{{
+                apy | percent : "1.2-2"
+              }}</span>
+            </div>
+          </div>
+          <div class="flex items-center">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-6 w-6 mr-2 text-purple-500"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2.5"
+                d="M13 10V3L4 14h7v7l9-11h-7z"
+              />
+            </svg>
+            <div class="flex flex-col">
+              <span class="font-semibold text-xs text-slate-600"
+                >Liquidity provider:
+              </span>
+              <span class="">{{ chainName }} (ID: {{ chainId }})</span>
+            </div>
+          </div>
+          <div class="flex items-center">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-5 w-5 mr-2 text-blue-500"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+              />
+            </svg>
+            <div class="flex flex-col">
+              <span class="font-semibold text-xs text-slate-600"
+                >Token to Supply:
+              </span>
+              <span class="font-mono">{{ tokenSymbol }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 items-center justify-end space-x-3 pt-4">
+          <button type="button" (click)="close()" class="button-secondary">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="button-icon"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="3"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+            <div>
+              <div class="mt-[0.1rem]">Cancel</div>
+            </div>
+          </button>
+          <button type="submit" [disabled]="!form.valid" class="button-primary">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="button-icon"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="3"
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+            <div class="mt-[0.1rem]">Confirm</div>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+
+<ng-template #loading>
+  <div *ngIf="!itxHash" class="max-w-lg animate-pulse flex flex-row justify-center items-center w-full p-8 rounded-md bg-white">
+    Processing tx...
+  </div>
+  <div class="max-w-lg flex flex-col items-center gap-y-2 justify-center w-full p-8 rounded-md bg-white" *ngIf="itxHash">
+    <div class="text-green-600">Success!</div> 
+    <div>
+      Interchain transaction sucessfully sent for execution. Track the progress of your transaction(s) on the
+      link below:
+    </div>
+    <a target="_blank" class="underline text-indigo-700 text-sm" 
+    href="https://explorer.klaster.io/details/{{itxHash}}">{{itxHash.substring(0,5)}}...{{itxHash.substring(itxHash.length - 6, itxHash.length - 1)}}</a>
+    <button class="button-primary" (click)="close()">Close</button>
+  </div>
+</ng-template>

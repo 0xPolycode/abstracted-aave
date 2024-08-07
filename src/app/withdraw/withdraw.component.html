@@ -1,0 +1,46 @@
+<div
+  (click)="close()"
+  *ngIf="position as position"
+  class="fixed top-0 left-0 w-screen h-screen flex flex-row justify-center items-center bg-[rgba(0,0,0,0.2)] backdrop-blur-[2px]"
+>
+  <div
+    (click)="$event.stopPropagation()"
+    class="max-w-lg w-full flex flex-col p-8 rounded-md bg-white"
+  >
+    <div class="flex flex-col" *ngIf="!isProcessing">
+      <div (click)="close()" class="w-full flex flex-row text-slate-500 justify-end mb-12 cursor-pointer hover:underline gap-x-2 items-center">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide h-5 w-5 lucide-circle-x"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
+        <div>Close</div>
+      </div>
+      <div class="flex flex-row justify-between">
+        <div>Available to withdraw</div>
+        <div>{{ position.amount }}</div>
+      </div>
+      <input
+        [formControl]="amountControl"
+        class="w-full py-2 px-4 !outline-none bg-white border rounded-md mt-4 border-slate-100"
+        type="number"
+      />
+      <button
+        (click)="withdrawAave()"
+        class="w-full mt-4 py-3 bg-indigo-600 hover:bg-indigo-800 rounded-md text-white"
+      >
+        Withdraw
+      </button>
+    </div>
+
+    <div
+      *ngIf="isProcessing && !iTxHash"
+      class="max-w-lg w-full flex flex-col p-8 rounded-md bg-white animate-pulse"
+    >
+      Waiting for signature & processing transaction...
+    </div>
+
+    <div
+      *ngIf="isProcessing && iTxHash"
+      class="max-w-lg w-full flex flex-col p-8 rounded-md bg-white"
+    >
+      Track progress on <a target="_blank" class="underline hover:text-indigo-700" href="https://explorer.klaster.io/details/{{iTxHash}}">Klaster Explorer</a>
+    </div>
+  </div>
+</div>
