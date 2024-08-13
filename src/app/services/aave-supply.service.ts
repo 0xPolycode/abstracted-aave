@@ -1,5 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Address, parseUnits, encodeFunctionData } from 'viem';
+import { scroll } from 'viem/chains';
+import { aaveV3PoolAddresses } from './aave-yield-finder.service';
 
 @Injectable({
   providedIn: 'root',
@@ -34,22 +36,13 @@ export class AaveSupplyEncodeService {
       type: 'function',
     },
   ] as const;
-
-  // Aave V3 Pool addresses for different networks
-  private poolAddresses: { [chainId: number]: Address } = {
-    10: '0x794a61358D6845594F94dc1DB02A252b5b4814aD',  // Optimism
-    137: '0x794a61358D6845594F94dc1DB02A252b5b4814aD', // Polygon
-    42161: '0x794a61358D6845594F94dc1DB02A252b5b4814aD', // Arbitrum
-    43114: '0x794a61358D6845594F94dc1DB02A252b5b4814aD', // Avalanche
-    8453: '0xA238Dd80C259a72e81d7e4664a9801593F98d1c5', // Base
-    56: '0x6807dc923806fE8Fd134338EABCA509979a7e0cB'   // BNB Chain (formerly BSC)
-  };
+ 
 
   encodeApproveCalldata(
     chainId: number,
     amount: bigint,
   ): `0x${string}` {
-    if (!this.poolAddresses[chainId]) {
+    if (!aaveV3PoolAddresses[chainId]) {
       throw new Error(`Unsupported chain ID: ${chainId}`);
     }
 
@@ -57,7 +50,7 @@ export class AaveSupplyEncodeService {
     return encodeFunctionData({
       abi: this.erc20Abi,
       functionName: 'approve',
-      args: [this.poolAddresses[chainId], amount],
+      args: [aaveV3PoolAddresses[chainId], amount],
     });
   }
 
@@ -67,7 +60,7 @@ export class AaveSupplyEncodeService {
     amount: bigint,
     userAddress: Address,
   ): `0x${string}` {
-    if (!this.poolAddresses[chainId]) {
+    if (!aaveV3PoolAddresses[chainId]) {
       throw new Error(`Unsupported chain ID: ${chainId}`);
     }
 
@@ -80,7 +73,7 @@ export class AaveSupplyEncodeService {
   }
 
   getPoolAddress(chainId: number): Address {
-    const poolAddress = this.poolAddresses[chainId];
+    const poolAddress = aaveV3PoolAddresses[chainId];
     if (!poolAddress) {
       throw new Error(`Unsupported chain ID: ${chainId}`);
     }

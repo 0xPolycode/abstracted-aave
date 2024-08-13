@@ -10,6 +10,7 @@ import { ReactiveFormsModule } from '@angular/forms';
 import { ChainInfoComponent } from './components/chain-info/chain-info.component';
 import { WithdrawComponent } from './withdraw/withdraw.component';
 import { SafePipe } from './sanitize.pipe';
+import { ModalInfoComponent } from './components/modal-info/modal-info.component';
 @NgModule({
   declarations: [
     AppComponent,
@@ -17,7 +18,8 @@ import { SafePipe } from './sanitize.pipe';
     SafePipe,
     SupplyBorrowModalComponent,
     ChainInfoComponent,
-    WithdrawComponent
+    WithdrawComponent,
+    ModalInfoComponent
   ],
   imports: [
     BrowserModule,

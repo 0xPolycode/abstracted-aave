@@ -4,7 +4,7 @@ import { map, catchError } from 'rxjs/operators';
 import { mcUSDC, mcUSDT } from './tokens.constants';
 import { BlockchainService, mcClient } from './blockchain.service';
 import { Address, createPublicClient, encodeFunctionData, http, parseAbi, parseUnits, PublicClient } from 'viem';
-import { Chain, mainnet, optimism, arbitrum, polygon, avalanche, base } from 'viem/chains';
+import { Chain, mainnet, optimism, arbitrum, polygon, avalanche, base, scroll } from 'viem/chains';
 
 interface SuppliedPosition {
   chainId: number;
@@ -29,7 +29,8 @@ export class AavePositionsService {
     { chainId: arbitrum.id, usdcAToken: '0x724dc807b04555b71ed48a6896b6F41593b8C637', usdtAToken: '0x6ab707Aca953eDAeFBc4fD23bA73294241490620' },
     { chainId: polygon.id, usdcAToken: '0xA4D94019934D8333Ef880ABFFbF2FDd611C762BD', usdtAToken: '0x6ab707Aca953eDAeFBc4fD23bA73294241490620' },
     { chainId: avalanche.id, usdcAToken: '0x625E7708f30cA75bfd92586e17077590C60eb4cD', usdtAToken: '0x6ab707Aca953eDAeFBc4fD23bA73294241490620' },
-    { chainId: base.id, usdcAToken: '0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB' }  // No USDT aToken for Base
+    { chainId: base.id, usdcAToken: '0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB' },  // No USDT aToken for Base,
+    { chainId: scroll.id, usdcAToken: '0x1D738a3436A8C49CefFbaB7fbF04B660fb528CbD'}
   ];
 
   constructor() {
@@ -37,7 +38,7 @@ export class AavePositionsService {
   }
 
   private initializeClients() {
-    const chains: Chain[] = [mainnet, optimism, arbitrum, polygon, avalanche, base];
+    const chains: Chain[] = [mainnet, optimism, arbitrum, polygon, avalanche, base, scroll];
     chains.forEach(chain => {
       const rpcForChain = mcClient.chainsRpcInfo.find(info => info.chainId === chain.id)?.rpcUrl;
       if (rpcForChain) {
@@ -57,9 +58,9 @@ export class AavePositionsService {
       requests.push(this.fetchPosition(userAddress, mapping, 'USDC'));
     });
 
-    // Fetch USDT positions (excluding Base)
+    // Fetch USDT positions (excluding Base and Scroll)
     mcUSDT.forEach(mapping => {
-      if (mapping.chainId !== base.id) {
+      if ((mapping.chainId !== base.id) && (mapping.chainId !== scroll.id)) {
         requests.push(this.fetchPosition(userAddress, mapping, 'USDT'));
       }
     });
@@ -131,6 +132,7 @@ export class AavePositionsService {
       case polygon.id: return '0x794a61358D6845594F94dc1DB02A252b5b4814aD';
       case avalanche.id: return '0x794a61358D6845594F94dc1DB02A252b5b4814aD';
       case arbitrum.id: return '0x794a61358D6845594F94dc1DB02A252b5b4814aD';
+      case scroll.id: return '0x11fCfe756c05AD438e312a7fd934381537D3cFfe';
     }
     throw Error(`No aave pool found for ${chainId}`)
   }

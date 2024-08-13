@@ -1,115 +1,191 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { Observable, forkJoin, of } from 'rxjs';
-import { map, catchError, switchMap } from 'rxjs/operators';
-import { TokenMapping, TokenDeployment, USDC, USDT, WRAPPED_NATIVE, NATIVE } from '../utils/token-mappings.util';
-import { TokenSelectorService } from './token-selector.service';
-import { Address, formatUnits } from 'viem';
-import { ChainNamePipe } from '../chain-name.pipe';
+import { Observable, from, forkJoin } from 'rxjs';
+import { map, mergeMap } from 'rxjs/operators';
+import { Address, createPublicClient, http, PublicClient, getContract, formatUnits, parseAbi } from 'viem';
+import { mcClient } from './blockchain.service';
+import { mcUSDC, mcUSDT } from './tokens.constants';
+import { arbitrum, avalanche, base, polygon } from 'viem/chains';
+import { aaveV3PoolAbi } from '../../generated';
 
 export interface YieldInfo {
   symbol: string;
   chainId: number;
   supplyYield: number;
   borrowYield: number;
-  tokenAddress: Address
-  chainName: string
-  marketAddress: string
+  tokenAddress: Address;
+  chainName: string;
+  marketAddress: Address;
 }
+
+type YieldAggr = {
+  bestSupplyYield: YieldInfo;
+  bestBorrowYield: YieldInfo;
+};
+
+type MultichainTokenMapping = { chainId: number; address: Address }[];
+
+export type ChainRpcInfo = {
+  chainId: number;
+  rpcUrl: string;
+};
+
+const ABI = aaveV3PoolAbi
+
+type AaveV3PoolAddresses = { [chainId: number]: Address };
+type ChainNames = { [chainId: number]: string };
+
+export const aaveV3PoolAddresses: AaveV3PoolAddresses = {
+  10: '0x794a61358D6845594F94dc1DB02A252b5b4814aD',
+  42161: '0x794a61358D6845594F94dc1DB02A252b5b4814aD',
+  137: '0x794a61358D6845594F94dc1DB02A252b5b4814aD',
+  43114: '0x794a61358D6845594F94dc1DB02A252b5b4814aD',
+  8453: '0xA238Dd80C259a72e81d7e4664a9801593F98d1c5',
+  534352: '0x11fCfe756c05AD438e312a7fd934381537D3cFfe'
+};
 
 @Injectable({
   providedIn: 'root'
 })
 export class AaveV3YieldService {
-  private readonly aaveApiUrl = 'https://aave-api-v2.aave.com/data/markets-data';
-  private readonly tokenMappings: { [symbol: string]: TokenMapping } = {
-    USDC: USDC,
-    USDT: USDT,
-    WNATIVE: WRAPPED_NATIVE,
-    NATIVE: NATIVE
+  private clients: Map<number, PublicClient> = new Map();
+
+  private readonly chainNames: ChainNames = {
+    1: 'Ethereum',
+    137: 'Polygon',
   };
 
-  constructor(
-    private http: HttpClient,
-    private tokenSelector: TokenSelectorService,
-  ) {}
 
-  getBestYields(tokenMapping: TokenMapping): Observable<YieldInfo[]> {
-    return this.tokenSelector.selectTokens(tokenMapping).pipe(
-      switchMap(tokens => forkJoin(
-        tokens.map(token => this.getYieldForToken(tokenMapping, token))
-      )),
-      map(yieldInfos => yieldInfos.filter((yieldInfo): yieldInfo is YieldInfo => yieldInfo !== null))
+  constructor() {
+    this.initializeClients();
+  }
+
+  private initializeClients(): void {
+    mcClient.chainsRpcInfo.forEach(({ chainId, rpcUrl }: ChainRpcInfo) => {
+      this.clients.set(chainId, createPublicClient({
+        chain: {
+          id: chainId,
+          name: 'NA',
+          nativeCurrency: {
+            decimals: 18,
+            name: 'NA',
+            symbol: 'NA'
+          },
+          rpcUrls: {
+            default: {
+              http: [
+                rpcUrl
+              ]
+            }
+          }
+        },
+        transport: http(rpcUrl)
+      }));
+    });
+  }
+
+  public getBestYields(tokenMapping: MultichainTokenMapping): Observable<YieldAggr> {
+    const observables: Observable<YieldInfo[]>[] = tokenMapping.map(
+      (token: { chainId: number; address: Address }) => this.getYieldInfo(token.chainId, token.address)
+    );
+    return forkJoin(observables).pipe(
+      map((results: YieldInfo[][]) => this.processBestYields(results.flat()))
     );
   }
 
-  private getYieldForToken(tokenMapping: TokenMapping, token: TokenDeployment): Observable<YieldInfo | null> {
-    const url = `${this.aaveApiUrl}/${token.chainId}`;
-    return this.http.get<any>(url).pipe(
-      map(response => {
-        const reserveData = response.reserves.find((reserve: any) => 
-          reserve.underlyingAsset.toLowerCase() === token.address.toLowerCase()
-        );
+  getBestYieldsForSymbol(symbol: 'USDC' | 'USDT'): Observable<YieldAggr> {
+    if(symbol === 'USDC') { 
+      return this.getBestYields(mcUSDC)
+    } else {
+      return this.getBestYields(mcUSDT)
+    }
+  }
 
-        if (!reserveData) {
-          console.warn(`Token ${tokenMapping.symbol} not found in AAVE v3 market for chain ${token.chainId}`);
-          return null;
-        }
-        const chainName = new ChainNamePipe()
-        return {
-          symbol: tokenMapping.symbol,
-          chainId: token.chainId,
-          supplyYield: this.calculateAPY(reserveData.liquidityRate),
-          borrowYield: this.calculateAPY(reserveData.variableBorrowRate),
-          tokenAddress: token.address,
-          chainName: chainName.transform(token.chainId),
-          marketAddress: ''
-        };
+  private getYieldInfo(chainId: number, tokenAddress: Address): Observable<YieldInfo[]> {
+    const client: PublicClient | undefined = this.clients.get(chainId);
+    if (!client) {
+      console.warn(`No Viem client found for chain ID ${chainId}`);
+      return from([]);
+    }
+
+    const poolAddress: Address | undefined = aaveV3PoolAddresses[chainId];
+    if (!poolAddress) {
+      console.warn(`No Aave V3 Pool address found for chain ID ${chainId}`);
+      return from([]);
+    }
+
+    const poolContract = getContract({
+      address: poolAddress,
+      abi: ABI,
+      client: client,
+    });
+
+    return from(poolContract.read['getReserveData']([tokenAddress])).pipe(
+      mergeMap(async (reserveData: any) => {
+        const {
+          configuration,
+          liquidityIndex,
+          currentLiquidityRate,
+          variableBorrowIndex,
+          currentVariableBorrowRate,
+          currentStableBorrowRate,
+          lastUpdateTimestamp,
+          id,
+          aTokenAddress,
+          stableDebtTokenAddress,
+          variableDebtTokenAddress,
+          interestRateStrategyAddress,
+          accruedToTreasury,
+          unbacked,
+          isolationModeTotalDebt
+        } = reserveData
+
+        const symbol: string = await this.getTokenSymbol(client, tokenAddress);
+
+        return [{
+          symbol,
+          chainId,
+          supplyYield: Number(formatUnits(currentLiquidityRate, 27)),
+          borrowYield: Number(formatUnits(currentVariableBorrowRate, 27)),
+          tokenAddress,
+          chainName: this.chainNames[chainId] || `Unknown Chain ${chainId}`,
+          marketAddress: aTokenAddress
+        }];
       }),
-      catchError(error => {
-        console.error(`Error fetching yield for ${tokenMapping.symbol} on chain ${token.chainId}:`, error);
-        return of(null);
-      })
+      map((yieldInfo: YieldInfo[]) => yieldInfo)
     );
   }
 
-  private calculateAPY(rate: string): number {
+  private async getTokenSymbol(client: PublicClient, tokenAddress: Address): Promise<string> {
     try {
-      const bigIntRate = BigInt(rate);
-      const rateAsNumber = Number(formatUnits(bigIntRate, 27));
-      const SECONDS_PER_YEAR = 31536000;
-      return (1 + rateAsNumber / SECONDS_PER_YEAR) ** SECONDS_PER_YEAR - 1;
+      const tokenContract = getContract({
+        address: tokenAddress,
+        abi: [{ inputs: [], name: 'symbol', outputs: [{ type: 'string' }], stateMutability: 'view', type: 'function' }],
+        client: client,
+      });
+
+      return await tokenContract.read.symbol() as string;
     } catch (error) {
-      const rateAsNumber = parseFloat(rate);
-      if (isNaN(rateAsNumber)) {
-        console.error(`Unable to parse rate: ${rate}`);
-        return 0;
+      console.error(`Error fetching token symbol for ${tokenAddress}:`, error);
+      return 'UNKNOWN';
+    }
+  }
+
+  private processBestYields(yieldInfos: YieldInfo[]): YieldAggr {
+    let bestSupplyYield: YieldInfo = yieldInfos[0];
+    let bestBorrowYield: YieldInfo = yieldInfos[0];
+
+    yieldInfos.forEach((info: YieldInfo) => {
+      if (info.supplyYield > bestSupplyYield.supplyYield) {
+        bestSupplyYield = info;
       }
-      const SECONDS_PER_YEAR = 31536000;
-      return (1 + rateAsNumber / SECONDS_PER_YEAR) ** SECONDS_PER_YEAR - 1;
-    }
-  }
+      if (info.borrowYield < bestBorrowYield.borrowYield) {
+        bestBorrowYield = info;
+      }
+    });
 
-  getBestYieldsForSymbol(symbol: string): Observable<{ bestSupplyYield: YieldInfo | null, bestBorrowYield: YieldInfo | null }> {
-    const tokenMapping = this.getTokenMappingForSymbol(symbol);
-    if (!tokenMapping) {
-      return of({ bestSupplyYield: null, bestBorrowYield: null });
-    }
-
-    return this.getBestYields(tokenMapping).pipe(
-      map(yieldInfos => ({
-        bestSupplyYield: yieldInfos.reduce((best, current) => 
-          current.supplyYield > best.supplyYield ? current : best
-        ),
-        bestBorrowYield: yieldInfos.reduce((best, current) => 
-          current.borrowYield < best.borrowYield ? current : best
-        )
-      }))
-    );
-  }
-
-  private getTokenMappingForSymbol(symbol: string): TokenMapping | null {
-    const upperSymbol = symbol.toUpperCase();
-    return this.tokenMappings[upperSymbol] || null;
+    return {
+      bestSupplyYield,
+      bestBorrowYield
+    };
   }
 }

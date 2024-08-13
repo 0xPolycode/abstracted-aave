@@ -1,9 +1,5 @@
 import { Component, OnInit } from '@angular/core';
 import { from, map, Observable, of, repeat, switchMap } from 'rxjs';
-import {
-  AaveV3YieldService,
-  YieldInfo,
-} from './services/aave-yield-finder.service';
 import { BlockchainService, mcClient } from './services/blockchain.service';
 import { Address, formatUnits, parseUnits } from 'viem';
 import { mcUSDC, mcUSDT } from './services/tokens.constants';
@@ -11,6 +7,11 @@ import { AavePositionsService } from './services/aave-get-supplies.service';
 import { buildItx } from 'klaster-sdk';
 import { base } from 'viem/chains';
 import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
+import {
+  AaveV3YieldService,
+  YieldInfo,
+} from './services/aave-yield-finder.service';
+import { ModalService } from './services/modal.service';
 
 type YieldAggr = {
   bestSupplyYield: YieldInfo;
@@ -47,7 +48,7 @@ export class AppComponent {
 
   eoa = this.blockchainService.address;
 
-  depositChains = mcClient.chainsRpcInfo.map(x => x.chainId)
+  depositChains = mcClient.chainsRpcInfo.map((x) => x.chainId);
 
   v3Positions$ = this.blockchainService.multichainAddress$.pipe(
     switchMap((address) => {
@@ -60,52 +61,43 @@ export class AppComponent {
       return positions.map((position) => {
         return { ...position, amount: formatUnits(BigInt(position.amount), 6) };
       });
-    })
+    }),
   );
 
   totalsSupplied$ = this.v3Positions$.pipe(
-    map(positions => {
-      const totalUSC = positions.filter(x => x.token === 'USDC').map(x => parseUnits(x.amount, 6))
-        .reduce((curr, acc) => { return curr + acc }, BigInt(0))
-      const totalUSDT = positions.filter(x => x.token === 'USDT').map(x => parseUnits(x.amount, 6))
-        .reduce((curr, acc) => { return curr + acc }, BigInt(0))
+    map((positions) => {
+      const totalUSC = positions
+        .filter((x) => x.token === 'USDC')
+        .map((x) => parseUnits(x.amount, 6))
+        .reduce((curr, acc) => {
+          return curr + acc;
+        }, BigInt(0));
+      const totalUSDT = positions
+        .filter((x) => x.token === 'USDT')
+        .map((x) => parseUnits(x.amount, 6))
+        .reduce((curr, acc) => {
+          return curr + acc;
+        }, BigInt(0));
       return {
         usdc: formatUnits(totalUSC, 6),
-        usdt: formatUnits(totalUSDT, 6)
-      }
-    })
-  )
-  
-  suppliesExpanded = false
+        usdt: formatUnits(totalUSDT, 6),
+      };
+    }),
+  );
 
-  viewBreakdownToggled: 'USDC' | 'USDT' | null = null
+  suppliesExpanded = false;
+
+  viewBreakdownToggled: 'USDC' | 'USDT' | null = null;
 
   constructor(
     private aaveYieldService: AaveV3YieldService,
     private blockchainService: BlockchainService,
     private aavePositionsService: AavePositionsService,
-    private sanitizer: DomSanitizer
+    private modalService: ModalService
   ) {
-    this.usdcYields$ = this.aaveYieldService
-      .getBestYieldsForSymbol('USDC')
-      .pipe(
-        map((x) => {
-          return {
-            bestSupplyYield: x.bestSupplyYield!,
-            bestBorrowYield: x.bestBorrowYield!,
-          };
-        })
-      );
-    this.usdtYields$ = this.aaveYieldService
-      .getBestYieldsForSymbol('USDT')
-      .pipe(
-        map((x) => {
-          return {
-            bestSupplyYield: x.bestSupplyYield!,
-            bestBorrowYield: x.bestBorrowYield!,
-          };
-        })
-      );
+    this.usdcYields$ = this.aaveYieldService.getBestYieldsForSymbol('USDC');
+
+    this.usdtYields$ = this.aaveYieldService.getBestYieldsForSymbol('USDT');
 
     this.blockchainService.klasterInitialized = () => {
       this.init();
@@ -113,30 +105,46 @@ export class AppComponent {
   }
 
   toggleExpand() {
-    this.suppliesExpanded = !this.suppliesExpanded
+    this.suppliesExpanded = !this.suppliesExpanded;
   }
 
   setViewBreakdown(value: 'USDC' | 'USDT' | null) {
-    if(this.viewBreakdownToggled === value) {
-      this.viewBreakdownToggled = null
+    if (this.viewBreakdownToggled === value) {
+      this.viewBreakdownToggled = null;
     }
-    this.viewBreakdownToggled = value
+    this.viewBreakdownToggled = value;
   }
 
   async withdrawAll() {
-    this.v3Positions$.subscribe(async positions => {
-      const withdrawItxs = await Promise.all(positions.map(async position => {
-        return await this.blockchainService.encodeWithdrawAAVE(parseUnits(position.amount, 6), position.chainId, position.token)
-      }))
-      const steps = withdrawItxs.map(x => x.steps)
-        .reduce((curr, acc) => acc.concat(curr))
+    this.v3Positions$.subscribe(async (positions) => {
+      const withdrawItxs = await Promise.all(
+        positions.map(async (position) => {
+          return await this.blockchainService.encodeWithdrawAAVE(
+            parseUnits(position.amount, 6),
+            position.chainId,
+            position.token,
+          );
+        }),
+      );
+      const fees = await this.blockchainService.getSuggestedGasInfo()
+      if(!fees) {
+        this.modalService.openError('Funds too low', 'Not enough funds to pay for gas fees')
+        return
+      }
+      const steps = withdrawItxs
+        .map((x) => x.steps)
+        .reduce((curr, acc) => acc.concat(curr));
       const iTx = buildItx({
         steps: steps,
-        feeTx: this.blockchainService.klasterSDK!.buildFeeTx('USDC', base.id)
+        feeTx: this.blockchainService.klasterSDK!.buildFeeTx(fees.paymentToken, fees.chainId),
+      });
+      const result = await this.blockchainService.executeItx(iTx);
+      this.modalService.openModal({
+        message: `https://explorer.klaster.io/details/${result.itxHash}`,
+        title: 'Transaction received',
+        type: 'success'
       })
-      const result = await this.blockchainService.executeItx(iTx)
-      alert(`https://explorer.klaster.io/details/${result.itxHash}`)
-    })
+    });
   }
 
   async requestWallets() {
@@ -145,7 +153,7 @@ export class AppComponent {
   }
 
   formatBalance(balance: string) {
-    return parseFloat(balance).toFixed(2)
+    return parseFloat(balance).toFixed(2);
   }
 
   openWithdraw(position: any) {
@@ -153,14 +161,14 @@ export class AppComponent {
   }
 
   usdcBreakdown: {
-    chainId: number, 
-    amount: string
-  }[] = []
+    chainId: number;
+    amount: string;
+  }[] = [];
 
   usdtBreakdown: {
-    chainId: number, 
-    amount: string
-  }[] = []
+    chainId: number;
+    amount: string;
+  }[] = [];
 
   async init() {
     const [address] =
@@ -172,24 +180,24 @@ export class AppComponent {
     }
     const usdcBalance = await this.blockchainService.getUnifiedBalance(
       mcUSDC,
-      mcAddress
+      mcAddress,
     );
     const usdtBalance = await this.blockchainService.getUnifiedBalance(
       mcUSDT,
-      mcAddress
+      mcAddress,
     );
-    this.usdcBreakdown = usdcBalance.breakdown.map(x => {
+    this.usdcBreakdown = usdcBalance.breakdown.map((x) => {
       return {
         amount: parseFloat(formatUnits(x.amount, 6)).toFixed(2),
-        chainId: x.chainId
-      }
-    })
-    this.usdtBreakdown = usdtBalance.breakdown.map(x => {
+        chainId: x.chainId,
+      };
+    });
+    this.usdtBreakdown = usdtBalance.breakdown.map((x) => {
       return {
         amount: parseFloat(formatUnits(x.amount, 6)).toFixed(2),
-        chainId: x.chainId
-      }
-    })
+        chainId: x.chainId,
+      };
+    });
     this.usdcBalance = formatUnits(usdcBalance.balance, usdcBalance.decimals);
     this.usdtBalance = formatUnits(usdtBalance.balance, usdtBalance.decimals);
     this.mcSca = mcAddress;
@@ -202,7 +210,7 @@ export class AppComponent {
     apy: number,
     chainName: string,
     chainId: number,
-    marketAddress: string
+    marketAddress: string,
   ) {
     this.modalActionType = actionType;
     this.modalTokenSymbol = tokenSymbol;
@@ -216,6 +224,10 @@ export class AppComponent {
 
   closeModal() {
     this.isModalVisible = false;
+  }
+
+  parseNumber(num: string) {
+    return parseFloat(num).toFixed(2);
   }
 
   handleTransactionData(callData: `0x${string}`) {

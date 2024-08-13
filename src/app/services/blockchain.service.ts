@@ -11,6 +11,7 @@ import {
   getTokenAddressForChainId,
   initKlaster,
   InterchainTransaction,
+  klasterNodeHost,
   KlasterSDK,
   MultichainTokenMapping,
   PaymentTokenSymbol,
@@ -39,21 +40,30 @@ import {
   getContract,
   http,
   parseAbi,
+  parseUnits,
   zeroAddress,
 } from 'viem';
-import { arbitrum, avalanche, base, bsc, optimism, polygon } from 'viem/chains';
+import {
+  arbitrum,
+  avalanche,
+  base,
+  bsc,
+  optimism,
+  polygon,
+  scroll,
+} from 'viem/chains';
 import { AaveSupplyEncodeService } from './aave-supply.service';
 import { AcrossBridgeService } from './across.service';
 import { AavePositionsService } from './aave-get-supplies.service';
 import { mcUSDC, mcUSDT } from './tokens.constants';
 
 export const mcClient = buildMultichainReadonlyClient(
-  [optimism, base, arbitrum, polygon, avalanche].map((chain) => {
+  [optimism, base, arbitrum, polygon, avalanche, scroll].map((chain) => {
     return {
       chainId: chain.id,
       rpcUrl: chain.rpcUrls.default.http[0],
     };
-  })
+  }),
 );
 
 @Injectable({
@@ -78,7 +88,7 @@ export class BlockchainService {
     private http: HttpClient,
     private aaveService: AaveSupplyEncodeService,
     private acrossService: AcrossBridgeService,
-    private aavePositionsService: AavePositionsService
+    private aavePositionsService: AavePositionsService,
   ) {
     this.initKlaster();
   }
@@ -89,7 +99,7 @@ export class BlockchainService {
     this.address = address;
     this.klasterSDK = await initKlaster({
       masterAddress: address,
-      nodeUrl: 'https://klaster-node.polycode.sh/v2/',
+      nodeUrl: klasterNodeHost.default
     });
     this.multichainAddressSub.next(this.klasterSDK.account.address);
     this.klasterInitialized?.();
@@ -101,7 +111,7 @@ export class BlockchainService {
 
   async getUnifiedBalance(
     tokenMapping: MultichainTokenMapping,
-    address: Address
+    address: Address,
   ) {
     return mcClient.getUnifiedErc20Balance({
       tokenMapping,
@@ -112,12 +122,12 @@ export class BlockchainService {
   async executeItx(iTx: InterchainTransaction) {
     if (!this.klasterSDK) {
       throw new Error(
-        'Calling execute function while Klaster SDK not initialized.'
+        'Calling execute function while Klaster SDK not initialized.',
       );
     }
     if (!this.address) {
       throw new Error(
-        `Can't call execute until EOA address has been fetched from viem.`
+        `Can't call execute until EOA address has been fetched from viem.`,
       );
     }
     return this.klasterSDK.autoExecute(iTx, (hash) => {
@@ -150,10 +160,10 @@ export class BlockchainService {
 
     const unifiedBalance = await mcClient.getUnifiedErc20Balance({
       tokenMapping: tokenMapping,
-      address: address
-    })
+      address: address,
+    });
 
-    console.log(unifiedBalance)
+    console.log(unifiedBalance);
 
     const bridgingData = await calculateMultibridgeData({
       tokenMapping: tokenMapping,
@@ -162,7 +172,8 @@ export class BlockchainService {
       client: mcClient,
       destinationChainId: destChainId,
       unifiedBalance: unifiedBalance,
-      encodingFunction: async data => this.acrossService.encodeBridgeTxAcross(data),
+      encodingFunction: async (data) =>
+        this.acrossService.encodeBridgeTxAcross(data),
     });
 
     const destToken = getTokenAddressForChainId(tokenMapping, destChainId);
@@ -171,12 +182,15 @@ export class BlockchainService {
     }
 
     const receivedByBridging = bridgingData.totalReceivedOnDestination;
-    const remaining = inputAmount - receivedByBridging
-    const preBridgeOnDest = unifiedBalance.breakdown.find(x => x.chainId === destChainId)?.amount ?? 0n
+    const remaining = inputAmount - receivedByBridging;
+    const preBridgeOnDest =
+      unifiedBalance.breakdown.find((x) => x.chainId === destChainId)?.amount ??
+      0n;
 
-    const destAmount = (preBridgeOnDest > remaining ? inputAmount : (receivedByBridging + preBridgeOnDest))
-     - 10000n
-
+    const destAmount =
+      (preBridgeOnDest > inputAmount
+        ? inputAmount
+        : receivedByBridging + preBridgeOnDest);
 
     const approveAaveTx = rawTx({
       to: destToken,
@@ -191,7 +205,7 @@ export class BlockchainService {
         destToken,
         destChainId,
         destAmount,
-        address
+        address,
       ),
     });
 
@@ -203,10 +217,42 @@ export class BlockchainService {
     });
   }
 
+  async getSuggestedGasInfo() {
+    const usdcBalance = await mcClient.getUnifiedErc20Balance({
+      tokenMapping: mcUSDC,
+      address: this.klasterSDK!.account.address,
+    });
+    const usdtBalance = await mcClient.getUnifiedErc20Balance({
+      tokenMapping: mcUSDT,
+      address: this.klasterSDK!.account.address,
+    });
+    const neededAmount = parseUnits('1', 6);
+    const usdcEnough = usdcBalance.breakdown
+      .filter((x) => x.amount > neededAmount)
+      .at(0);
+    const usdtEnough = usdtBalance.breakdown
+      .filter((x) => x.amount > neededAmount)
+      .at(0);
+
+      if (usdcEnough) {
+      return {
+        chainId: usdcEnough.chainId,
+        paymentToken: 'USDC' as PaymentTokenSymbol,
+      };
+    }
+    if (usdtEnough) {
+      return {
+        chainId: usdtEnough.chainId,
+        paymentToken: 'USDT' as PaymentTokenSymbol,
+      };
+    }
+    return null;
+  }
+
   async encodeWithdrawAAVE(
     amount: bigint,
     chainId: number,
-    token: 'USDC' | 'USDT'
+    token: 'USDC' | 'USDT',
   ) {
     if (!this.klasterSDK) {
       throw Error(`Klaster SDK not initialized`);
@@ -220,7 +266,7 @@ export class BlockchainService {
 
     if (!tokenAddress) {
       throw Error(
-        `Can't fetch the underlying token ${token} on chain ${chainId}`
+        `Can't fetch the underlying token ${token} on chain ${chainId}`,
       );
     }
 
@@ -228,8 +274,14 @@ export class BlockchainService {
       chainId,
       tokenAddress,
       amount,
-      userAddress
+      userAddress,
     );
+
+    const fees = await this.getSuggestedGasInfo();
+
+    if (!fees) {
+      throw(`Not enough funds to pay for transaction fee.`)
+    }
 
     return buildItx({
       steps: [
@@ -240,10 +292,10 @@ export class BlockchainService {
             gasLimit: BigInt(220000),
             data: data,
             value: BigInt(0),
-          })
+          }),
         ),
       ],
-      feeTx: this.klasterSDK.buildFeeTx('USDC', chainId),
+      feeTx: this.klasterSDK.buildFeeTx(fees.paymentToken, fees.chainId),
     });
   }
 }
