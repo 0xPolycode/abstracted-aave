@@ -30,5 +30,9 @@ export class ModalService {
 export type ModalData = {
   title: string,
   message: string,
-  type: 'info' | 'warning' | 'error' | 'success'
+  link?: {
+    text: string,
+    link: string
+  },
+  type: 'info' | 'warning' | 'error' | 'success' | 'loading'
 }

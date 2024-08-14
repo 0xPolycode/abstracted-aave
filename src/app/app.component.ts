@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { from, map, Observable, of, repeat, switchMap } from 'rxjs';
+import { catchError, from, map, Observable, of, repeat, switchMap } from 'rxjs';
 import { BlockchainService, mcClient } from './services/blockchain.service';
 import { Address, formatUnits, parseUnits } from 'viem';
 import { mcUSDC, mcUSDT } from './services/tokens.constants';
@@ -12,6 +12,7 @@ import {
   YieldInfo,
 } from './services/aave-yield-finder.service';
 import { ModalService } from './services/modal.service';
+import { fadeInAnimation } from './utils/fadein.animation';
 
 type YieldAggr = {
   bestSupplyYield: YieldInfo;
@@ -22,6 +23,7 @@ type YieldAggr = {
   selector: 'app-root',
   styleUrl: './app.component.css',
   templateUrl: './app.component.html',
+  animations: [fadeInAnimation]
 })
 export class AppComponent {
   usdcYields$: Observable<YieldAggr>;
@@ -49,6 +51,8 @@ export class AppComponent {
   eoa = this.blockchainService.address;
 
   depositChains = mcClient.chainsRpcInfo.map((x) => x.chainId);
+
+  finishedLoading = false
 
   v3Positions$ = this.blockchainService.multichainAddress$.pipe(
     switchMap((address) => {
@@ -93,7 +97,7 @@ export class AppComponent {
     private aaveYieldService: AaveV3YieldService,
     private blockchainService: BlockchainService,
     private aavePositionsService: AavePositionsService,
-    private modalService: ModalService
+    private modalService: ModalService,
   ) {
     this.usdcYields$ = this.aaveYieldService.getBestYieldsForSymbol('USDC');
 
@@ -116,39 +120,63 @@ export class AppComponent {
   }
 
   async withdrawAll() {
+    this.modalService.openModal({
+      title: 'Processing',
+      message: 'Waiting for approval for Withdraw All',
+      type: 'loading'
+    })
     this.v3Positions$.subscribe(async (positions) => {
       const withdrawItxs = await Promise.all(
         positions.map(async (position) => {
-          return await this.blockchainService.encodeWithdrawAAVE(
-            parseUnits(position.amount, 6),
-            position.chainId,
-            position.token,
-          );
+          try {
+            return await this.blockchainService.encodeWithdrawAAVE(
+              parseUnits(position.amount, 6),
+              position.chainId,
+              position.token,
+            );
+          } catch (e: any) {
+            this.modalService.dismissModal()
+            this.modalService.openError('Error', e);
+            throw e;
+          }
         }),
       );
-      const fees = await this.blockchainService.getSuggestedGasInfo()
-      if(!fees) {
-        this.modalService.openError('Funds too low', 'Not enough funds to pay for gas fees')
-        return
+      const fees = await this.blockchainService.getSuggestedGasInfo();
+      if (!fees) {
+        this.modalService.dismissModal()
+        this.modalService.openError(
+          'Funds too low',
+          'Not enough funds to pay for gas fees',
+        );
+        return;
       }
       const steps = withdrawItxs
         .map((x) => x.steps)
         .reduce((curr, acc) => acc.concat(curr));
       const iTx = buildItx({
         steps: steps,
-        feeTx: this.blockchainService.klasterSDK!.buildFeeTx(fees.paymentToken, fees.chainId),
+        feeTx: this.blockchainService.klasterSDK!.buildFeeTx(
+          fees.paymentToken,
+          fees.chainId,
+        ),
       });
       const result = await this.blockchainService.executeItx(iTx);
+      this.modalService.dismissModal()
       this.modalService.openModal({
-        message: `https://explorer.klaster.io/details/${result.itxHash}`,
+        message: ``,
         title: 'Transaction received',
-        type: 'success'
-      })
+        type: 'success',
+        link: {
+          text: 'Klaster Explorer',
+          link: `https://explorer.klaster.io/details/${result.itxHash}`,
+        },
+      });
     });
   }
 
   async requestWallets() {
     const res = await this.blockchainService.viemClient.requestAddresses();
+    this.finishedLoading = true
     this.eoa = res.at(0);
   }
 

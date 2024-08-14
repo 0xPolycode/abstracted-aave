@@ -1,6 +1,6 @@
 <div *ngIf="isVisible" class="modal-overlay">
   <div
-    *ngIf="isProcessing === false; else loading"
+    *ngIf="isProcessing === false"
     class="bg-white rounded-lg border max-w-lg w-full transform transition-all duration-200"
     [ngClass]="{
       'scale-95 opacity-0': !isVisible,
@@ -27,7 +27,7 @@
               d="M12 6v6m0 0v6m0-6h6m-6 0H6"
             />
           </svg>
-          <span class="mt-1">Supply {{ tokenSymbol }}</span>
+          <span class="mt-1">Save {{ tokenSymbol }}</span>
         </h2>
         <button (click)="close()" class="text-gray-400 hover:text-gray-600">
           <svg
@@ -50,7 +50,7 @@
       <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-4">
         <div class="">
           <label for="amount" class="block text-sm font-medium text-gray-700"
-            >Amount to supply</label
+            >Amount to put into savings</label
           >
           <div class="relative border rounded-md grid grid-cols-12 mt-1">
             <input
@@ -64,6 +64,17 @@
               class="absolute border-l pl-4 inset-y-0 col-span-2 right-0 pr-3 flex items-center pointer-events-none"
             >
               <span class="text-gray-500 sm:text-sm">{{ tokenSymbol }}</span>
+            </div>
+          </div>
+          <div class="mt-2 w-full flex justify-end text-xs text-slate-600 font-normal">
+            <div class="underline cursor-pointer mr-1">Max available</div>({{parseMaxBalance()}})
+          </div>
+          <div class="mt-2 py-3 bg-indigo-50 font-light text-xs px-4 gap-x-4 flex flex-row items-center text-indigo-700 rounded-md">
+            <div class="p-2 bg-indigo-500 font-semibold text-white rounded-sm">
+              i
+            </div>
+            <div>
+              Max available amount is smaller than your balance to account for bridging fees and transaction costs.
             </div>
           </div>
         </div>
@@ -88,7 +99,7 @@
             </svg>
             <div class="flex flex-col">
               <span class="font-semibold text-xs text-slate-600"
-                >Supply APY:
+                >Savings APY
               </span>
               <span class="text-green-600 font-semibold">{{
                 apy | percent: "1.2-2"
@@ -113,7 +124,7 @@
             </svg>
             <div class="flex flex-col">
               <span class="font-semibold text-xs text-slate-600"
-                >Token to Supply:
+                >Token
               </span>
               <span class="font-mono">{{ tokenSymbol }}</span>
             </div>
@@ -254,53 +265,3 @@
     </div>
   </div>
 </div>
-
-<ng-template #loading>
-  <div
-    *ngIf="!itxHash"
-    class="max-w-lg flex flex-col justify-center items-center w-full p-8 backdrop-blur-md rounded-md bg-white"
-  >
-  <svg
-  xmlns="http://www.w3.org/2000/svg"
-  width="24"
-  height="24"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
-  class="lucide lucide-loader mb-4 animate-spin"
->
-  <path d="M12 2v4" />
-  <path d="m16.2 7.8 2.9-2.9" />
-  <path d="M18 12h4" />
-  <path d="m16.2 16.2 2.9 2.9" />
-  <path d="M12 18v4" />
-  <path d="m4.9 19.1 2.9-2.9" />
-  <path d="M2 12h4" />
-  <path d="m4.9 4.9 2.9 2.9" />
-</svg>
-    Waiting for signature & processing.
-
-  </div>
-  <div
-    class="max-w-lg flex flex-col items-center gap-y-2 justify-center w-full p-8 rounded-md bg-white"
-    *ngIf="itxHash"
-  >
-    <div class="text-green-600">Success!</div>
-    <div>
-      Interchain transaction sucessfully sent for execution. Track the progress
-      of your transaction(s) on the link below:
-    </div>
-    <a
-      target="_blank"
-      class="underline text-indigo-700 text-sm"
-      href="https://explorer.klaster.io/details/{{ itxHash }}"
-      >{{ itxHash.substring(0, 5) }}...{{
-        itxHash.substring(itxHash.length - 6, itxHash.length - 1)
-      }}</a
-    >
-    <button class="button-primary" (click)="close()">Close</button>
-  </div>
-</ng-template>

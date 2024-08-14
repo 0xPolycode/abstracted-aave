@@ -11,6 +11,8 @@ import { BlockchainService, mcClient } from '../services/blockchain.service';
 import { PaymentTokenSymbol, UnifiedBalanceResult } from 'klaster-sdk';
 import { base, optimism, polygon } from 'viem/chains';
 import { mcUSDC, mcUSDT } from '../services/tokens.constants';
+import { buffer } from 'rxjs';
+import { ModalService } from '../services/modal.service';
 
 @Component({
   selector: 'app-supply-borrow-modal',
@@ -28,8 +30,8 @@ export class SupplyBorrowModalComponent {
   @Input() chainId: number = 0;
   @Input() marketAddress: string = '';
   @Input() balances!: {
-    usdc: UnifiedBalanceResult;
-    usdt: UnifiedBalanceResult;
+    usdc: string;
+    usdt: string;
   };
 
   @Output() closeModal = new EventEmitter<void>();
@@ -46,7 +48,8 @@ export class SupplyBorrowModalComponent {
 
   constructor(
     private fb: FormBuilder,
-    private blockchainService: BlockchainService
+    private blockchainService: BlockchainService,
+    private modalService: ModalService
   ) {
     this.form = this.fb.group({
       amount: ['', [Validators.required, Validators.min(0)]],
@@ -56,9 +59,26 @@ export class SupplyBorrowModalComponent {
   chains = mcClient.chainsRpcInfo;
 
   close() {
-    this.closeModal.emit();
+    this.closeModal.emit()
     this.isProcessing = false;
+    this.isVisible = false;
   }
+
+  parseMaxBalance() {
+    const result = this.tokenSymbol === 'USDC' ?
+      parseFloat(this.balances.usdc) : parseFloat(this.balances.usdt)
+    if(result === 0) {
+      return "0"
+    }
+    const buffer = 1
+    const reducedResult =  result - buffer
+    if(reducedResult <= 0) {
+      return "0"
+    }
+    return reducedResult.toFixed(2)
+  }
+
+
 
   toggleChangePool() {
     this.isChangePoolToggled = !this.isChangePoolToggled;
@@ -78,19 +98,29 @@ export class SupplyBorrowModalComponent {
 
   async supply() {
     try {
+      this.modalService.openModal({
+        title: 'Supplying',
+        message: 'Waiting for approval for supply action',
+        type: 'loading'
+      })
       const mapping = this.tokenSymbol === 'USDC' ? mcUSDC : mcUSDT;
       const amount = String(this.form.get('amount')?.value);
       if (!amount) {
-        alert('Empty amount input field');
+        this.modalService.openError(
+          'Error',
+          'Amount input field is empty'
+        )
         return;
       }
 
       const suggestedFee = await this.blockchainService.getSuggestedGasInfo();
 
       if (!suggestedFee) {
-        alert(
-          'Not enough funds to pay for transaction fee. Try supplying less to the saving pool.'
-        );
+        this.modalService.openError(
+          'Error',
+          `Not enough funds to pay for transaction fee. Try supplying less to the saving pool or topping up your
+          USDC or USDT balance on any of the supported networks.`
+        )
         return;
       }
 
@@ -102,10 +132,23 @@ export class SupplyBorrowModalComponent {
         paymentToken: suggestedFee.paymentToken,
       });
       const result = await this.blockchainService.executeItx(iTx);
-      this.itxHash = result.itxHash;
-    } catch (e) {
-      alert(e);
+      this.close()
+      this.modalService.openModal({
+        title: 'Transaction posted',
+        message: '',
+        type: 'info',
+        link: {
+          text: 'Open Klaster Explorer',
+          link: `https://explorer.klaster.io/details/${result.itxHash}`
+        }
+      })
+      
+    } catch (e: any) {
       this.close();
+      this.modalService.openError(
+        'Error',
+        e
+      )
     }
   }
 }

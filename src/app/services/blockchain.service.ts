@@ -200,7 +200,7 @@ export class BlockchainService {
 
     const supplyAaveTx = rawTx({
       to: this.aaveService.getPoolAddress(destChainId),
-      gasLimit: BigInt(200000),
+      gasLimit: BigInt(300000),
       data: this.aaveService.encodeSupplyCalldata(
         destToken,
         destChainId,
@@ -217,7 +217,7 @@ export class BlockchainService {
     });
   }
 
-  async getSuggestedGasInfo() {
+  async getSuggestedGasInfo(excludeChains: number[] = []) {
     const usdcBalance = await mcClient.getUnifiedErc20Balance({
       tokenMapping: mcUSDC,
       address: this.klasterSDK!.account.address,
@@ -227,10 +227,10 @@ export class BlockchainService {
       address: this.klasterSDK!.account.address,
     });
     const neededAmount = parseUnits('1', 6);
-    const usdcEnough = usdcBalance.breakdown
+    const usdcEnough = usdcBalance.breakdown.filter(item => !excludeChains.includes(item.chainId))
       .filter((x) => x.amount > neededAmount)
       .at(0);
-    const usdtEnough = usdtBalance.breakdown
+    const usdtEnough = usdtBalance.breakdown.filter(item => !excludeChains.includes(item.chainId))
       .filter((x) => x.amount > neededAmount)
       .at(0);
 
@@ -289,7 +289,7 @@ export class BlockchainService {
           chainId,
           rawTx({
             to: this.aavePositionsService.getAavePoolAddress(chainId),
-            gasLimit: BigInt(220000),
+            gasLimit: BigInt(300000),
             data: data,
             value: BigInt(0),
           }),
