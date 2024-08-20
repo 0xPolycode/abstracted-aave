@@ -89,6 +89,8 @@ export class AppComponent {
     }),
   );
 
+  demoConditionsVisible = true
+
   suppliesExpanded = false;
 
   viewBreakdownToggled: 'USDC' | 'USDT' | null = null;
@@ -102,10 +104,11 @@ export class AppComponent {
     this.usdcYields$ = this.aaveYieldService.getBestYieldsForSymbol('USDC');
 
     this.usdtYields$ = this.aaveYieldService.getBestYieldsForSymbol('USDT');
+  }
 
-    this.blockchainService.klasterInitialized = () => {
-      this.init();
-    };
+  async acceptDemoConditions() {
+    this.init();
+    this.demoConditionsVisible = false
   }
 
   toggleExpand() {
@@ -126,11 +129,29 @@ export class AppComponent {
       type: 'loading'
     })
     this.v3Positions$.subscribe(async (positions) => {
+      
+      const fees = await this.blockchainService.getSuggestedGasInfo();
+      if (!fees) {
+        this.modalService.dismissModal()
+        this.modalService.openError(
+          'Funds too low',
+          'Not enough funds to pay for gas fees',
+        );
+        return;
+      }
+
       const withdrawItxs = await Promise.all(
         positions.map(async (position) => {
           try {
+            // If it's the same chain where you're paying for gas
+            // reduce the required amount to leave some buffer for gas 
+            // costs  
+            const amount = fees.chainId === position.chainId ?
+              parseUnits(position.amount, 6) - parseUnits("0.5", 6) : 
+              parseUnits(position.amount, 6)
+
             return await this.blockchainService.encodeWithdrawAAVE(
-              parseUnits(position.amount, 6),
+              amount,
               position.chainId,
               position.token,
             );
@@ -141,18 +162,13 @@ export class AppComponent {
           }
         }),
       );
-      const fees = await this.blockchainService.getSuggestedGasInfo();
-      if (!fees) {
-        this.modalService.dismissModal()
-        this.modalService.openError(
-          'Funds too low',
-          'Not enough funds to pay for gas fees',
-        );
-        return;
-      }
+
+
+
       const steps = withdrawItxs
         .map((x) => x.steps)
         .reduce((curr, acc) => acc.concat(curr));
+
       const iTx = buildItx({
         steps: steps,
         feeTx: this.blockchainService.klasterSDK!.buildFeeTx(

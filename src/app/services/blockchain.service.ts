@@ -163,7 +163,6 @@ export class BlockchainService {
       address: address,
     });
 
-    console.log(unifiedBalance);
 
     const bridgingData = await calculateMultibridgeData({
       tokenMapping: tokenMapping,
@@ -226,10 +225,11 @@ export class BlockchainService {
       tokenMapping: mcUSDT,
       address: this.klasterSDK!.account.address,
     });
-    const neededAmount = parseUnits('1', 6);
+    const neededAmount = parseUnits('0.5', 6);
     const usdcEnough = usdcBalance.breakdown.filter(item => !excludeChains.includes(item.chainId))
-      .filter((x) => x.amount > neededAmount)
-      .at(0);
+    .filter((x) => x.amount > neededAmount)
+    .at(0);
+    
     const usdtEnough = usdtBalance.breakdown.filter(item => !excludeChains.includes(item.chainId))
       .filter((x) => x.amount > neededAmount)
       .at(0);

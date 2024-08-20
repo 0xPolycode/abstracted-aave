@@ -4,6 +4,7 @@ import {
   Output,
   EventEmitter,
   ChangeDetectionStrategy,
+  OnInit,
 } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { encodeFunctionData, formatUnits, parseUnits } from 'viem';
@@ -20,7 +21,7 @@ import { ModalService } from '../services/modal.service';
   styleUrl: './supply-borrow-modal.component.css',
   changeDetection: ChangeDetectionStrategy.Default,
 })
-export class SupplyBorrowModalComponent {
+export class SupplyBorrowModalComponent implements OnInit {
   @Input() isVisible: boolean = false;
   @Input() actionType: 'Supply' | 'Borrow' = 'Supply';
   @Input() tokenSymbol: string = '';
@@ -39,7 +40,7 @@ export class SupplyBorrowModalComponent {
 
   private _chainId = this.chainId;
 
-  form: FormGroup;
+  form!: FormGroup;
 
   isProcessing = false;
   itxHash?: string;
@@ -49,36 +50,56 @@ export class SupplyBorrowModalComponent {
   constructor(
     private fb: FormBuilder,
     private blockchainService: BlockchainService,
-    private modalService: ModalService
+    private modalService: ModalService,
   ) {
     this.form = this.fb.group({
-      amount: ['', [Validators.required, Validators.min(0)]],
+      amount: [
+        '',
+        [
+          Validators.required,
+          Validators.min(0),
+        ],
+      ],
     });
+  }
+
+  ngOnInit(): void {
+    this.form.controls['amount'].addValidators(
+      Validators.max(
+        parseFloat(this.parseMaxBalance())
+      )
+    )
   }
 
   chains = mcClient.chainsRpcInfo;
 
   close() {
-    this.closeModal.emit()
+    this.closeModal.emit();
     this.isProcessing = false;
     this.isVisible = false;
   }
 
-  parseMaxBalance() {
-    const result = this.tokenSymbol === 'USDC' ?
-      parseFloat(this.balances.usdc) : parseFloat(this.balances.usdt)
-    if(result === 0) {
-      return "0"
-    }
-    const buffer = 1
-    const reducedResult =  result - buffer
-    if(reducedResult <= 0) {
-      return "0"
-    }
-    return reducedResult.toFixed(2)
+  setMaxAvailable() {
+    this.form.controls['amount'].setValue(
+      this.parseMaxBalance()
+    )
   }
 
-
+  parseMaxBalance() {
+    const result =
+      this.tokenSymbol === 'USDC'
+        ? parseFloat(this.balances.usdc)
+        : parseFloat(this.balances.usdt);
+    if (result === 0) {
+      return '0';
+    }
+    const buffer = 1;
+    const reducedResult = result - buffer;
+    if (reducedResult <= 0) {
+      return '0';
+    }
+    return reducedResult.toFixed(2);
+  }
 
   toggleChangePool() {
     this.isChangePoolToggled = !this.isChangePoolToggled;
@@ -101,26 +122,25 @@ export class SupplyBorrowModalComponent {
       this.modalService.openModal({
         title: 'Supplying',
         message: 'Waiting for approval for supply action',
-        type: 'loading'
-      })
+        type: 'loading',
+      });
       const mapping = this.tokenSymbol === 'USDC' ? mcUSDC : mcUSDT;
       const amount = String(this.form.get('amount')?.value);
       if (!amount) {
-        this.modalService.openError(
-          'Error',
-          'Amount input field is empty'
-        )
+        this.modalService.openError('Error', 'Amount input field is empty');
         return;
       }
 
-      const suggestedFee = await this.blockchainService.getSuggestedGasInfo();
+      const suggestedFee = await this.blockchainService.getSuggestedGasInfo([
+        this.chainId
+      ]);
 
       if (!suggestedFee) {
         this.modalService.openError(
           'Error',
           `Not enough funds to pay for transaction fee. Try supplying less to the saving pool or topping up your
-          USDC or USDT balance on any of the supported networks.`
-        )
+          USDC or USDT balance on any of the supported networks.`,
+        );
         return;
       }
 
@@ -132,23 +152,19 @@ export class SupplyBorrowModalComponent {
         paymentToken: suggestedFee.paymentToken,
       });
       const result = await this.blockchainService.executeItx(iTx);
-      this.close()
+      this.close();
       this.modalService.openModal({
         title: 'Transaction posted',
         message: '',
         type: 'info',
         link: {
           text: 'Open Klaster Explorer',
-          link: `https://explorer.klaster.io/details/${result.itxHash}`
-        }
-      })
-      
+          link: `https://explorer.klaster.io/details/${result.itxHash}`,
+        },
+      });
     } catch (e: any) {
       this.close();
-      this.modalService.openError(
-        'Error',
-        e
-      )
+      this.modalService.openError('Error', e);
     }
   }
 }
