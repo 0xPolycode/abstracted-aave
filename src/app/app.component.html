@@ -836,7 +836,8 @@
   <div class="h-12 mt-6 bg-slate-100 w-full animate-pulse"></div>
 </ng-template>
 
-<div *ngIf="demoConditionsVisible"
+<div
+  *ngIf="demoConditionsVisible"
   class="w-screen h-screen fixed z-50 bg-[rgba(0,0,0,0.3)] backdrop-blur-md flex justify-center items-center top-0 left-0"
 >
   <div
@@ -862,16 +863,19 @@
     </svg>
 
     <div class="text-sm">
-      This is a demo app meant to demonstrate the chain abstraction capabilities of the Klaster
-      SDK and Protocol. <br /> <br />
-      Please do not use with any meaningful amounts of money. The app wasn't audited nor checked for critical bugs :) <br> <br>
-      + You will need a wallet such as MetaMask or Rabby for this to work. <br>
+      This is a demo app meant to demonstrate the chain abstraction capabilities
+      of the Klaster SDK and Protocol. <br />
+      <br />
+      Please do not use with any meaningful amounts of money. The app wasn't
+      audited nor checked for critical bugs :) <br />
+      <br />
+      + You will need a wallet such as MetaMask or Rabby for this to work.
+      <br />
       + The app doesn't support mobile screens.
-
     </div>
 
-
-    <button (click)="acceptDemoConditions()"
+    <button
+      (click)="acceptDemoConditions()"
       class="py-3 w-full bg-orange-500 font-normal hover:bg-orange-700 transition-all text-white rounded-lg mt-8"
     >
       I understand
