@@ -11,6 +11,7 @@ import { ChainInfoComponent } from './components/chain-info/chain-info.component
 import { WithdrawComponent } from './withdraw/withdraw.component';
 import { SafePipe } from './sanitize.pipe';
 import { ModalInfoComponent } from './components/modal-info/modal-info.component';
+import { PullFundsComponent } from './components/pull-funds/pull-funds.component';
 @NgModule({
   declarations: [
     AppComponent,
@@ -19,7 +20,8 @@ import { ModalInfoComponent } from './components/modal-info/modal-info.component
     SupplyBorrowModalComponent,
     ChainInfoComponent,
     WithdrawComponent,
-    ModalInfoComponent
+    ModalInfoComponent,
+    PullFundsComponent
   ],
   imports: [
     BrowserModule,

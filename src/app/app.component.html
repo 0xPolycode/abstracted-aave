@@ -23,6 +23,7 @@
         srcset=""
       />
 
+
       <div
         class="bg-amber-50 p-8 text-justify text-orange-800 font-light w-full border border-amber-200 text-sm rounded-md"
       >
@@ -124,6 +125,10 @@
 <ng-template #balanceScreen>
   <div class="max-w-7xl mx-auto px-4">
     <div class="grid w-full p-4 grid-cols-1 md:grid-cols-2 gap-6">
+
+      <div class="w-full col-span-2 text-xs font-light py-3 text-orange-800 px-6 bg-amber-100 rounded-md border-orange-700 border">
+        This is an alpha version of the developer demo app and not meant for consumer usage. Do not use with meaningful amounts of funds.  
+      </div>
       <!-- View accounts and balances -->
       <ng-component *ngIf="true; then accountScreen"></ng-component>
 
@@ -234,7 +239,7 @@
           <p class="yield-chain">
             {{ usdcYields.bestBorrowYield.chainId | chainName }}
           </p>
-          <button
+          <button disabled
             class="action-button bg-green-50 text-green-700 hover:bg-green-600"
           >
             <svg
@@ -253,7 +258,7 @@
               <path d="m6 11 6 6 6-6" />
               <path d="M19 21H5" />
             </svg>
-            Borrow
+            Borrow (ToDo)
           </button>
         </div>
       </div>
@@ -351,17 +356,7 @@
             {{ usdtYields.bestBorrowYield.chainId | chainName }}
           </p>
           <button
-            (click)="
-              openModal(
-                'Borrow',
-                'USDT',
-                usdtYields.bestBorrowYield.tokenAddress,
-                usdtYields.bestBorrowYield.borrowYield,
-                usdtYields.bestBorrowYield.chainName,
-                usdtYields.bestBorrowYield.chainId,
-                usdtYields.bestBorrowYield.marketAddress
-              )
-            "
+            disabled
             class="action-button bg-green-50 text-green-500 hover:bg-green-600"
           >
             <svg
@@ -380,7 +375,7 @@
               <path d="m6 11 6 6 6-6" />
               <path d="M19 21H5" />
             </svg>
-            Borrow
+            Borrow (ToDo)
           </button>
         </div>
       </div>
@@ -787,7 +782,7 @@
     <div
       class="col-span-2 flex flex-row items-center w-full border-l hover:bg-slate-100 cursor-pointer border-slate-100"
     >
-      <div
+      <div (click)="showPullFunds()"
         class="rounded-md gap-x-2 cursor-pointer font-semibold text-sm flex flex-row w-full items-center justify-center"
       >
         Pull funds
@@ -838,10 +833,11 @@
 
 <div
   *ngIf="demoConditionsVisible"
-  class="w-screen h-screen fixed z-50 bg-[rgba(0,0,0,0.3)] backdrop-blur-md flex justify-center items-center top-0 left-0"
+  class="w-screen h-screen fixed z-50 bg-[rgba(255,255,255,0.5)] backdrop-blur-sm flex justify-center items-center top-0 left-0"
 >
   <div
-    class="max-w-md w-full font-light flex flex-col items-center bg-amber-50 text-orange-800 border-4 p-8 rounded-2xl border-orange-500"
+    class="max-w-md w-full font-light flex flex-col items-center backdrop-blur-md
+     bg-amber-100 bg-opacity-30 text-orange-800 border-2 p-8 rounded-lg border-orange-300"
   >
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -881,4 +877,8 @@
       I understand
     </button>
   </div>
+</div>
+
+<div *ngIf="isPullFundsVisible">
+  <app-pull-funds [isModalVisible]="isPullFundsVisible"></app-pull-funds>
 </div>

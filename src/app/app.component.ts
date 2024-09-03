@@ -29,6 +29,8 @@ export class AppComponent {
   usdcYields$: Observable<YieldAggr>;
   usdtYields$: Observable<YieldAggr>;
 
+  isPullFundsVisible = false
+
   isModalVisible = false;
   modalActionType: 'Supply' | 'Borrow' = 'Supply';
   modalTokenSymbol = '';
@@ -89,6 +91,10 @@ export class AppComponent {
     }),
   );
 
+  showPullFunds() {
+    this.isPullFundsVisible = true
+  }
+
   demoConditionsVisible = true
 
   suppliesExpanded = false;
@@ -143,21 +149,15 @@ export class AppComponent {
       const withdrawItxs = await Promise.all(
         positions.map(async (position) => {
           try {
-            // If it's the same chain where you're paying for gas
-            // reduce the required amount to leave some buffer for gas 
-            // costs  
-            const amount = fees.chainId === position.chainId ?
-              parseUnits(position.amount, 6) - parseUnits("0.5", 6) : 
-              parseUnits(position.amount, 6)
 
             return await this.blockchainService.encodeWithdrawAAVE(
-              amount,
+              parseUnits(position.amount, 6),
               position.chainId,
               position.token,
             );
           } catch (e: any) {
             this.modalService.dismissModal()
-            this.modalService.openError('Error', e);
+            this.modalService.openError('Error', JSON.stringify(e));
             throw e;
           }
         }),
